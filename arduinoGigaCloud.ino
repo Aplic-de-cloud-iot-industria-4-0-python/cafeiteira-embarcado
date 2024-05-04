@@ -3,8 +3,8 @@
 #define BOTAO 53
 #define RELE_1 52
 
-char ssid[] = "Penelopecharmosa";
-char pass[] = "13275274";
+char ssid[] = "";
+char pass[] = "";
 
 WiFiServer server(80);
 
