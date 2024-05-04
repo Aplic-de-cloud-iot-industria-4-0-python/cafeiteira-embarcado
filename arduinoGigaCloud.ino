@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <CoAPSimple.h>
 
 #define BOTAO 53
 #define RELE_1 52
@@ -7,6 +8,7 @@ char ssid[] = "";
 char pass[] = "";
 
 WiFiServer server(80);
+Coap coap(server);
 
 bool estado_botao = false;
 
@@ -41,31 +43,22 @@ void loop() {
   WiFiClient client = server.available(); // Espera por uma conexão
 
   if (client) { // Se houver uma conexão
-    Serial.println("Novo cliente conectado.");
-    String request = client.readStringUntil('\r'); // Lê a requisição HTTP até encontrar o caractere de retorno de carro (\r)
-    Serial.println(request); // Imprime a requisição na porta serial
+    if (coap.available()) {
+      packet = coap.readPacket();
+      Serial.print("Recebido de: ");
+      Serial.println(packet.senderIP.toString());
 
-    if (request.indexOf("/ligar") != -1) { // Se a requisição for para ligar
-      digitalWrite(RELE_1, LOW); // Liga o relé
-      client.println("HTTP/1.1 200 OK"); // Responde com código 200 OK
-      client.println("Content-Type: text/plain");
-      client.println();
-      client.println("Cafeteira Ligada");
-    } else if (request.indexOf("/desligar") != -1) { // Se a requisição for para desligar
-      digitalWrite(RELE_1, HIGH); // Desliga o relé
-      client.println("HTTP/1.1 200 OK"); // Responde com código 200 OK
-      client.println("Content-Type: text/plain");
-      client.println();
-      client.println("Cafeteira Desligada");
-    } else { // Se a requisição for para uma rota desconhecida
-      client.println("HTTP/1.1 404 Not Found"); // Responde com código 404 Not Found
-      client.println("Content-Type: text/plain");
-      client.println();
-      client.println("Rota não encontrada");
+      if (packet.code == CoapCode::GET) {
+        if (packet.uriPath == "/ligar") {
+          digitalWrite(RELE_1, LOW); // Liga o relé
+          coap.sendResponse(packet.senderIP, packet.senderPort, CoapCode::CONTENT, "Cafeteira Ligada");
+        } else if (packet.uriPath == "/desligar") {
+          digitalWrite(RELE_1, HIGH); // Desliga o relé
+          coap.sendResponse(packet.senderIP, packet.senderPort, CoapCode::CONTENT, "Cafeteira Desligada");
+        } else {
+          coap.sendResponse(packet.senderIP, packet.senderPort, CoapCode::NOT_FOUND, "Rota não encontrada");
+        }
+      }
     }
-
-    delay(1); // Espera para o cliente enviar todos os dados
-    client.stop(); // Fecha a conexão
-    Serial.println("Cliente desconectado.");
   }
 }
