@@ -1,64 +1,66 @@
 #include <WiFi.h>
-#include <CoAPSimple.h>
+#include <WiFiUdp.h>
+#include <coap-simple.h>
 
 #define BOTAO 53
 #define RELE_1 52
 
-char ssid[] = "";
-char pass[] = "";
+const char* ssid     = "ESTACIO-VISITANTES";
+const char* password = "estacio@2014";
 
-WiFiServer server(80);
-Coap coap(server);
-
-bool estado_botao = false;
+WiFiUDP udp;
+Coap coap(udp);
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial) { }
 
-  if (WiFi.status() == WL_NO_MODULE) {
-    Serial.println("Falha na comunicação com o módulo Wi-Fi!");
-    while (true);
-  }
-
+  WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print("Conectando à rede WPA SSID: ");
-    Serial.println(ssid);
-    WiFi.begin(ssid, pass);
-    delay(10000);
+    delay(500);
+    Serial.print(".");
   }
 
-  Serial.println("Conectado à rede Wi-Fi!");
-  Serial.print("Endereço IP: ");
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
-  pinMode(BOTAO, INPUT_PULLUP);
-  pinMode(RELE_1, OUTPUT);
-  digitalWrite(RELE_1, HIGH);
+  // LED State
+  pinMode(9, OUTPUT);
+  digitalWrite(9, HIGH);
+  
+  coap.server(callback_cafeteira_ligar, "ligar");
+  coap.server(callback_cafeteira_desligar, "desligar");
 
-  server.begin();
+  Serial.println("Setup Response Callback");
+  coap.response(callback_response);
+
+  // start coap server/client
+  coap.start();
 }
 
 void loop() {
-  WiFiClient client = server.available(); // Espera por uma conexão
+  delay(1000);
+  coap.loop();
+}
 
-  if (client) { // Se houver uma conexão
-    if (coap.available()) {
-      packet = coap.readPacket();
-      Serial.print("Recebido de: ");
-      Serial.println(packet.senderIP.toString());
+void callback_cafeteira_ligar(CoapPacket &packet, IPAddress ip, int port) {
+  digitalWrite(RELE_1, LOW); // Liga o relé
+  coap.sendResponse(ip, port, packet.messageid, "Cafeteira Ligada");
+}
 
-      if (packet.code == CoapCode::GET) {
-        if (packet.uriPath == "/ligar") {
-          digitalWrite(RELE_1, LOW); // Liga o relé
-          coap.sendResponse(packet.senderIP, packet.senderPort, CoapCode::CONTENT, "Cafeteira Ligada");
-        } else if (packet.uriPath == "/desligar") {
-          digitalWrite(RELE_1, HIGH); // Desliga o relé
-          coap.sendResponse(packet.senderIP, packet.senderPort, CoapCode::CONTENT, "Cafeteira Desligada");
-        } else {
-          coap.sendResponse(packet.senderIP, packet.senderPort, CoapCode::NOT_FOUND, "Rota não encontrada");
-        }
-      }
-    }
-  }
+void callback_cafeteira_desligar(CoapPacket &packet, IPAddress ip, int port) {
+  digitalWrite(RELE_1, HIGH); // Desliga o relé
+  coap.sendResponse(ip, port, packet.messageid, "Cafeteira Desligada");
+}
+
+// CoAP client response callback
+void callback_response(CoapPacket &packet, IPAddress ip, int port) {
+  Serial.println("[Coap Response got]");
+  
+  char p[packet.payloadlen + 1];
+  memcpy(p, packet.payload, packet.payloadlen);
+  p[packet.payloadlen] = NULL;
+  
+  Serial.println(p);
 }
