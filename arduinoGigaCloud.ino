@@ -2,11 +2,10 @@
 #include <WiFiUdp.h>
 #include <coap-simple.h>
 
-#define BOTAO 53
-#define RELE_1 52
+#define RELE_1 51
 
-const char* ssid     = "ESTACIO-VISITANTES";
-const char* password = "estacio@2014";
+const char* ssid     = "Penelopecharmosa";
+const char* password = "13275274";
 
 WiFiUDP udp;
 Coap coap(udp);
